@@ -1,0 +1,30 @@
+[package]
+name = "async-dingtalk"
+version = "1.0.0"
+description = "Dingtalk SDK for Rust"
+authors = ["cleveng <cleveng@gmail.com>"]
+license = "MIT"
+edition = "2021"
+repository = "https://github.com/cleveng/dingtalk.git"
+rust-version = "1.60.0"
+
+[dependencies]
+log = "0.4.22"
+reqwest = { version = "0.12.9", features = ["json"] }
+deadpool-redis = { version = "0.18.0", features = ["serde"] }
+redis = { version = "0.27.5", default-features = false, features = [] }
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.128"
+url = "2.5.4"
+
+[build-dependencies]
+
+[profile.dev]
+incremental = true
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
