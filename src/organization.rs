@@ -387,4 +387,65 @@ impl OrgApp {
 
         Ok(profile)
     }
+
+    /// Retrieves the total number of employees in the organization.
+    ///
+    /// [获取员工人数](https://open.dingtalk.com/document/orgapp/obtain-the-number-of-employees-v2)
+    ///
+    /// If `only_active` is `Some(true)`, only active employees are counted.
+    ///
+    /// # Arguments
+    ///
+    /// * `only_active` - An optional boolean indicating whether to only count active employees.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the total number of employees if successful, otherwise an error string.
+    pub async fn get_employee_count(
+        &self,
+        only_active: Option<bool>,
+    ) -> Result<i32, Box<dyn std::error::Error>> {
+        let mut params = HashMap::new();
+        params.insert("only_active", only_active.unwrap_or(false));
+
+        let at = match self.get_access_token().await {
+            Ok(at) => at,
+            Err(e) => return Err(e),
+        };
+
+        let response = self
+            .client
+            .post(format!(
+                "https://oapi.dingtalk.com/topapi/user/count?access_token={}",
+                at
+            ))
+            .json(&params)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(format!(
+                "Failed to response get employee count: {}",
+                response.status()
+            )
+            .into());
+        }
+
+        #[derive(Serialize, Deserialize, Debug)]
+        struct Response {
+            errcode: i32,
+            errmsg: String,
+            result: CountUserResponse,
+            request_id: Option<String>,
+        }
+
+        let res = response.json::<Response>().await?;
+
+        Ok(res.result.count)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct CountUserResponse {
+    count: i32,
 }
