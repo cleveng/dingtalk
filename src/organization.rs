@@ -208,6 +208,8 @@ impl OrgApp {
 
     /// Retrieves the organization information associated with the provided corporate ID.
     ///
+    /// [Documents](https://open.dingtalk.com/document/orgapp/obtain-enterprise-authentication-information)
+    ///
     /// This function first obtains an access token for the organization, then makes a request to the
     /// DingTalk API to retrieve the organization details.
     ///

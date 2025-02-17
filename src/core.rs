@@ -35,22 +35,30 @@ impl DingTalk {
         url.to_string()
     }
 
-    /// Set the access token for the application.
+    /// Obtain the access token for the application.
+    ///
+    /// This asynchronous function sends a POST request to the DingTalk API to obtain the access token
+    /// for the application. The request includes the authorization code in the query parameters for
+    /// authentication.
     ///
     /// [Documents](https://open.dingtalk.com/document/isvapp/obtain-identity-credentials)
     ///
     /// # Arguments
     ///
-    /// * `code` - The authorization code obtained from the redirect URL after authorization.
+    /// * `code` - The authorization code to obtain the access token.
     ///
     /// # Returns
     ///
-    /// A Result containing an empty string if the access token is set successfully, otherwise an error string.
+    /// Returns a `Result` containing the access token as a string if the request is successful,
+    /// or an error if the request fails or if the response status is not successful.
     ///
+    /// # Errors
+    ///
+    /// Returns an error if the response status is not successful, or if the request fails.
     pub async fn set_app_access_token(
         &self,
         code: String,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<String, Box<dyn std::error::Error>> {
         let mut params = HashMap::new();
         params.insert("clientId", self.appid.clone());
         params.insert("clientSecret", self.app_secret.clone());
@@ -90,7 +98,7 @@ impl DingTalk {
             .await
             .unwrap();
 
-        Ok(())
+        Ok(at.corp_id) // 企业corpId
     }
 
     /// Get the access token for the application.
