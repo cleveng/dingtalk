@@ -443,9 +443,138 @@ impl OrgApp {
 
         Ok(res.result.count)
     }
+
+    /// Query employees on job.
+    ///
+    /// [获取在职员工列表](https://open.dingtalk.com/document/orgapp/intelligent-personnel-query-the-list-of-on-the-job-employees-of-the)
+    ///
+    /// # Arguments
+    ///
+    /// * `status` - A string array representing the status of the employees to query.
+    /// * `offset` - An integer representing the offset of the query.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a `PageResult` object if the request is successful,
+    /// or an error if the request fails or if the response status is not successful.
+    pub async fn query_on_job_employees(
+        &self,
+        status: String,
+        offset: i32,
+    ) -> Result<PageResult, Box<dyn std::error::Error>> {
+        let mut params: HashMap<&str, String> = HashMap::new();
+        params.insert("status_list", status);
+        params.insert("offset", format!("{}", offset));
+        params.insert("size", "50".to_string());
+
+        let at = match self.get_access_token().await {
+            Ok(at) => at,
+            Err(e) => return Err(e),
+        };
+
+        let response = self
+            .client
+            .post(format!(
+                "https://oapi.dingtalk.com/topapi/smartwork/hrm/employee/queryonjob?access_token={}",
+                at
+            ))
+            .json(&params)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(format!(
+                "Failed to response get employee count: {}",
+                response.status()
+            )
+            .into());
+        }
+
+        #[derive(Serialize, Deserialize, Debug)]
+        struct Response {
+            errcode: i32,
+            errmsg: String,
+            result: PageResult,
+            request_id: Option<String>,
+        }
+
+        let res = response.json::<Response>().await?;
+
+        Ok(res.result)
+    }
+
+    /// Retrieves a list of employees who are no longer on the job.
+    ///
+    /// [获取离职员工列表](https://open.dingtalk.com/document/orgapp/obtain-the-list-of-employees-who-have-left)
+    ///
+    /// The results are paginated, with the `offset` parameter specifying the starting
+    /// index of the page. The `nextToken` parameter is used to fetch the next page.
+    ///
+    /// # Arguments
+    ///
+    /// * `offset` - The starting index of the page to fetch.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a `PageResult` object if the request is successful,
+    /// or an error if the request fails or if the response status is not successful.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the response status is not successful, or if the request fails.
+    pub async fn query_off_job_employees(
+        &self,
+        offset: i64,
+    ) -> Result<PageResult, Box<dyn std::error::Error>> {
+        let mut headers = HeaderMap::new();
+        match self.get_access_token().await {
+            Ok(at) => headers.insert(
+                HeaderName::from_static("x-acs-dingtalk-access-token"),
+                HeaderValue::from_str(&at).unwrap(),
+            ),
+            Err(e) => return Err(e),
+        };
+
+        let url: String = format!(
+            "https://api.dingtalk.com/v1.0/hrm/employees/dismissions?nextToken={}&maxResults=50",
+            offset
+        );
+        info!("query_off_job_employees: {}", url);
+
+        let response = self.client.get(&url).headers(headers).send().await?;
+        if !response.status().is_success() {
+            return Err(format!("Failed to get user info: {}", response.status()).into());
+        }
+
+        #[derive(Serialize, Deserialize, Debug)]
+        struct Response {
+            #[serde(rename = "nextToken")]
+            next_cursor: i64,
+            #[serde(rename = "hasMore")]
+            has_more: bool,
+            #[serde(rename = "userIdList")]
+            data: Vec<String>,
+        }
+        let result = response.json::<Response>().await?;
+        info!("query_off_job_employees: {:?}", &result);
+
+        let reply = PageResult {
+            data: result.data,
+            next_cursor: Some(result.next_cursor),
+        };
+
+        Ok(reply)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct CountUserResponse {
     count: i32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PageResult {
+    #[serde(rename = "data_list")]
+    pub data: Vec<String>,
+    pub next_cursor: Option<i64>,
 }
