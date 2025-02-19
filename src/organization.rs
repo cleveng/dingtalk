@@ -75,59 +75,63 @@ pub struct UserGetByCodeResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct Department {
+pub struct Department {
     #[serde(rename = "dept_id")]
-    id: i32,
+    pub id: i32,
     #[serde(rename = "order")]
-    sort_id: i64,
+    pub sort_id: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct LeaderInDepartment {
+pub struct LeaderInDepartment {
     #[serde(rename = "dept_id")]
-    id: i32,
-    leader: bool,
+    pub id: i32,
+    pub leader: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct Role {
-    id: i32,
-    name: String,
-    group_name: String,
+pub struct Role {
+    pub id: i32,
+    pub name: String,
+    pub group_name: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct UserGetProfileResponse {
-    active: bool,
-    admin: bool,
-    avatar: String,
-    boss: bool,
-    create_time: String,
-    dept_id_list: Vec<i32>,
-    dept_order_list: Vec<Department>,
-    email: String,
-    exclusive_account: bool,
-    hide_mobile: bool,
-    job_number: String,
-    leader_in_dept: Vec<LeaderInDepartment>,
-    mobile: String,
-    #[serde(rename = "name")]
-    username: String,
-    org_email: String,
-    real_authed: bool,
-    remark: String,
-    role_list: Vec<Role>,
-    senior: bool,
-    state_code: String,
-    telephone: String,
-    title: String,
+pub struct UserGetProfileResponse {
+    pub active: bool,
+    pub admin: bool,
+    pub avatar: String,
+    pub boss: bool,
+    pub create_time: String,
+    pub dept_id_list: Vec<i32>,
+    pub dept_order_list: Vec<Department>,
     #[serde(default)]
-    union_emp_ext: HashMap<String, String>,
+    pub email: Option<String>,
+    pub exclusive_account: bool,
+    pub hide_mobile: bool,
+    #[serde(default)]
+    pub job_number: String,
+    pub leader_in_dept: Vec<LeaderInDepartment>,
+    pub mobile: String,
+    #[serde(rename = "name")]
+    pub username: String,
+    #[serde(default)]
+    pub org_email: Option<String>,
+    pub real_authed: bool,
+    pub remark: String,
+    pub role_list: Vec<Role>,
+    pub senior: bool,
+    pub state_code: String,
+    pub telephone: String,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub union_emp_ext: HashMap<String, String>,
     #[serde(rename = "unionid")]
-    union_id: String,
+    pub union_id: String,
     #[serde(rename = "userid")]
-    user_id: String,
-    work_place: String,
+    pub user_id: String,
+    pub work_place: String,
 }
 
 pub struct OrgApp {
@@ -376,7 +380,7 @@ impl OrgApp {
         info!("get org user info {:?}", &profile);
 
         let profile: UserInfo = UserInfo {
-            email: Some(profile.org_email.clone()),
+            email: profile.org_email.clone(),
             union_id: profile.union_id.clone(),
             username: profile.username.clone(),
             visitor: None,
@@ -565,6 +569,77 @@ impl OrgApp {
 
         Ok(reply)
     }
+
+    /// Retrieves detailed profile information of an employee using their user ID.
+    ///
+    /// [查询用户详情](https://open.dingtalk.com/document/orgapp/query-user-details)
+    ///
+    /// This asynchronous function sends a POST request to the DingTalk API to fetch
+    /// detailed profile information of an employee based on the provided `user_id`.
+    /// The request includes an access token in the query parameters for authentication
+    /// and specifies the response language.
+    ///
+    /// # Arguments
+    ///
+    /// * `user_id` - A string representing the unique identifier of the employee.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Result` containing a `UserGetProfileResponse` object if the request is successful,
+    /// or an error if the request fails or if the response status is not successful.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the response status is not successful, or if the request fails.
+    pub async fn get_employee_userinfo(
+        &self,
+        user_id: String,
+    ) -> Result<EmployeeUser, Box<dyn std::error::Error>> {
+        let mut params: HashMap<&str, String> = HashMap::new();
+        params.insert("language", "zh_CN".to_string());
+        params.insert("userid", user_id);
+
+        let at = match self.get_access_token().await {
+            Ok(at) => at,
+            Err(e) => return Err(e),
+        };
+
+        let response = self
+            .client
+            .post(format!(
+                "https://oapi.dingtalk.com/topapi/v2/user/get?access_token={}",
+                at
+            ))
+            .json(&params)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(format!(
+                "Failed to response get employee count: {}",
+                response.status()
+            )
+            .into());
+        }
+
+        #[derive(Serialize, Deserialize, Debug)]
+        struct Response {
+            errcode: i32,
+            errmsg: String,
+            result: EmployeeUser,
+            request_id: Option<String>,
+        }
+
+        let result = match response.json::<Response>().await {
+            Ok(res) => res.result,
+            Err(e) => {
+                error!("Failed to get user info: {}", e);
+                return Err(e.into());
+            }
+        };
+
+        Ok(result)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -577,4 +652,60 @@ pub struct PageResult {
     #[serde(rename = "data_list")]
     pub data: Vec<String>,
     pub next_cursor: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EmployeeUser {
+    #[serde(rename = "unionid")]
+    pub union_id: String,
+    #[serde(rename = "userid")]
+    pub user_id: String,
+    #[serde(rename = "name")]
+    pub username: String,
+    #[serde(rename = "avatar")]
+    pub profile_url: String,
+    pub state_code: String,
+
+    #[serde(default)]
+    pub manager_userid: Option<String>,
+
+    pub mobile: String,
+    pub hide_mobile: bool,
+    pub telephone: String,
+
+    #[serde(default)]
+    pub job_number: String,
+
+    #[serde(default)]
+    pub title: String,
+
+    #[serde(default)]
+    pub email: Option<String>,
+    pub work_place: String,
+    pub remark: String,
+    pub exclusive_account: bool,
+
+    #[serde(default)]
+    pub org_email: Option<String>,
+
+    pub dept_id_list: Vec<i32>,
+    pub dept_order_list: Vec<Department>,
+
+    #[serde(default)]
+    pub extension: Option<String>,
+
+    #[serde(default)]
+    pub hired_date: Option<u64>,
+
+    pub active: bool,
+    pub real_authed: bool,
+    pub senior: bool,
+    pub admin: bool,
+    pub boss: bool,
+    pub leader_in_dept: Option<Vec<LeaderInDepartment>>,
+
+    #[serde(default)]
+    pub role_list: Option<Vec<Role>>,
+    #[serde(default)]
+    pub union_emp_ext: HashMap<String, String>,
 }

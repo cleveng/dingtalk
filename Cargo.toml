@@ -1,6 +1,6 @@
 [package]
 name = "async-dingtalk"
-version = "1.0.1"
+version = "1.0.2"
 description = "Dingtalk SDK for Rust"
 authors = ["cleveng <cleveng@gmail.com>"]
 license = "MIT"
